@@ -553,6 +553,44 @@ void t7_ir_led_on(void)
   s_ir_tx_n = 32;
 }
 int t7_ir_tx_take(uint8_t *out) { int n = s_ir_tx_n; if (!n) return 0; for (int i = 0; i < 32; i++) out[i] = s_ir_tx_pkt[i]; s_ir_tx_n = 0; return n; }
+/* Friends bump: the game sends and receives each packet bit by bit on one line ($303C bit 0 out, $3012 bit 7 in): $F0,
+ * command $0160, length $0161, the data at ($C5), the sum; status $0164 ($01 sending, $02 receiving, $80 done). It
+ * runs the link in bank 0 ($A723, $A759), so the switch to bank 0 calls t7_fr_hook (t7_memory.c): a packet just
+ * started is taken and reported sent, a waiting packet is put in for a receive. Only work RAM is read or written. */
+uint8_t g_t7_frlink;
+uint32_t g_t7_fr_act;
+static uint8_t s_fr_tx[130], s_fr_txn, s_fr_rx[130], s_fr_rxn;
+T7_FR_ATTR void t7_fr_hook(void)
+{
+  uint8_t st = g_wram[0x164]; uint32_t a = g_wram[0xC5] | g_wram[0xC6] << 8;
+  if (!(st & 1)) g_t7_fr_act++;
+  if (g_wram[0x166] != 1 || a >= 0x600) return;
+  uint8_t *d = g_wram + a;
+  if (st & 1) {
+    uint8_t n = g_wram[0x161]; if (n > 0x80 || a + n > 0x600) return;
+    s_fr_tx[0] = g_wram[0x160]; s_fr_tx[1] = n;
+    for (int i = 0; i < n; i++) s_fr_tx[2 + i] = d[i];
+    s_fr_txn = (uint8_t)(n + 2);
+  } else {
+    uint8_t n = s_fr_rx[1], s = (uint8_t)(s_fr_rx[0] + n);
+    if (!s_fr_rxn || a + n > 0x600) return;
+    s_fr_rxn = 0;
+    for (int i = 0; i < n; i++) { d[i] = s_fr_rx[2 + i]; s = (uint8_t)(s + d[i]); }
+    g_wram[0x160] = s_fr_rx[0]; g_wram[0x161] = n; g_wram[0x163] = s;
+  }
+  /* end the bit layer as the game does ($A5EA, $A6A0) */
+  g_wram[0xB1] &= (uint8_t)~0x20; t7_io_write(0x3071, g_wram[0xB1]);
+  t7_io_write(0x3031, st & 1 ? 0 : g_cpureg[0x31] & 0xFC); t7_io_write(0x303C, g_cpureg[0x3C] & 0xF6);
+  g_wram[0x169] = 0; g_wram[0x16A] = 0; g_wram[0x164] = 0x80;
+}
+T7_FR_ATTR int t7_fr_tx_take(uint8_t *out) { int n = s_fr_txn; for (int i = 0; i < n; i++) out[i] = s_fr_tx[i]; s_fr_txn = 0; return n; }
+T7_FR_ATTR void t7_fr_rx(const uint8_t *p, int n)
+{
+  s_fr_rxn = 0;
+  if (n < 2 || n > 130 || p[1] > 0x80 || n < 2 + p[1]) return;
+  for (int i = 0; i < n; i++) s_fr_rx[i] = p[i];
+  s_fr_rxn = (uint8_t)n;
+}
 #endif
 #ifndef T7_FASTRUN
 uint8_t T7_HOT t7_cpu_step(void) __attribute__((hot, optimize("O2")));

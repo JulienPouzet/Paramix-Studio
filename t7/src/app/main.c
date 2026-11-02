@@ -385,11 +385,36 @@ static void sess_auto(uint32_t now)
  * as it is to the other one ('T' frames of 32 bytes, as the T7Emu's IR bridge), and comes in there through the
  * bridge's receive hook. Only taken while the game is in its connection screen (else an old packet would wait). */
 static uint32_t g_lk_act, g_lk_ms;
-static void lk_got(u8 ty, const u8 *d, int n) { if (ty == 'T' && n == 32 && g_ms - g_lk_ms < 1500u) t7_ir_bridge_rx(d); }
+/* Friends bump: each packet as a 'B' frame of up to 64 bytes, the rest in 'b' frames that start with their offset;
+ * taken while the link runs or 1.5 s after a packet sent (the answer may come before the game waits for it) */
+static uint8_t g_fr_in[130], g_fr_n;
+T7_FR_ATTR static void fr_got(u8 ty, const u8 *d, int n)
+{
+  if (ty == 'B') g_fr_n = 0;
+  else if (!g_fr_n || !n || d[0] != g_fr_n) { g_fr_n = 0; return; }
+  else { d++; n--; }
+  for (int i = 0; i < n && g_fr_n < sizeof g_fr_in; i++) g_fr_in[g_fr_n++] = d[i];
+  if (g_fr_n >= 2 && g_fr_n >= 2 + g_fr_in[1]) { t7_fr_rx(g_fr_in, g_fr_n); g_fr_n = 0; }
+}
+T7_FR_ATTR static void fr_send(void)
+{
+  uint8_t p[130], f[64]; int n = t7_fr_tx_take(p);
+  if (n) g_lk_ms = g_ms; else if (g_ms - g_lk_ms >= 1500u) t7_fr_rx(0, 0);
+  if (!n) return;
+  plink_send('B', p, n > 64 ? 64 : n);
+  for (int o = 64; o < n; o += 63) { int k = n - o > 63 ? 63 : n - o; f[0] = (uint8_t)o; for (int i = 0; i < k; i++) f[1 + i] = p[o + i]; plink_send('b', f, k + 1); }
+}
+static void lk_got(u8 ty, const u8 *d, int n)
+{
+  if (g_ms - g_lk_ms >= 1500u) return;
+  if (ty == 'T' && n == 32) t7_ir_bridge_rx(d);
+  else if (g_t7_frlink && (ty == 'B' || ty == 'b')) fr_got(ty, d, n);
+}
 static void lk_tick(uint32_t now)
 {
-  uint32_t a = t7_ir_activity(); if (a != g_lk_act) { g_lk_act = a; g_lk_ms = now; }
+  uint32_t a = t7_ir_activity() + g_t7_fr_act; if (a != g_lk_act) { g_lk_act = a; g_lk_ms = now; }
   uint8_t p[32]; if (t7_ir_tx_take(p)) plink_send('T', p, 32);
+  if (g_t7_frlink) fr_send();
   plink_poll(now, now - g_lk_ms < 1500u ? 1u : 0u, lk_got);
 }
 #endif
@@ -430,6 +455,9 @@ static void x_load(void)
   u8 *buf = (u8 *)(((u32)&__x_end + 7u) & ~7u);
   t7_jit_init(buf, 0x1801F000u - (u32)buf);
   g_x_ok = g_t7j_on != 0;
+#ifdef T7_LINK
+  g_t7_frlink = (uint8_t)(g_x_ok && t7_is_friends());
+#endif
   plat_jit(app_jit());
 }
 #endif

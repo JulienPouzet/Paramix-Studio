@@ -127,6 +127,17 @@ void t7_ir_bridge_enable(int on);          // Bridge ein/aus (TX-Completion-Fake
 int  t7_ir_bridge_tx_poll(uint8_t *out32);  // 1 = neues Sende-Paket in out32
 uint32_t t7_ir_activity(void);              // steigt im IR-Verbindungsmenue
 int  t7_ir_tx_take(uint8_t *out32);         // T7_LINK (1.6.9): packet sent just now ($748E), 32 = new packet in out32
+// T7_LINK, Friends bump (t7_cpu.c), with the second part (PRAM is full)
+#if defined(T7_JIT) && defined(T7_FREESTANDING)
+#define T7_FR_ATTR __attribute__((section(".xcode_link"), noinline, minsize))
+#else
+#define T7_FR_ATTR __attribute__((noinline))
+#endif
+extern uint8_t  g_t7_frlink;                // 1 = Friends bump on (set by the program)
+extern uint32_t g_t7_fr_act;                // counts the passes with a receive armed (the connection screen)
+void t7_fr_hook(void);
+int  t7_fr_tx_take(uint8_t *out130);        // packet sent just now: command, length, data; its size, 0 = none
+void t7_fr_rx(const uint8_t *p, int n);     // packet from the other one for the next receive
 int  t7_ir_tx_pending(void);                // 1 = Firmware wartet auf Sende-Completion
 void t7_ir_tx_complete(void);               // Sende-Completion ausloesen (zeitverzoegert)
 

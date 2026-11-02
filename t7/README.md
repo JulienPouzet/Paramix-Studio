@@ -221,6 +221,15 @@ Sound must be on: the game waits for its beeps to end (`$A3` bit 7) also during 
 cores linked in lockstep: visit (guest away, the host shows both, guest home), GAME (YOU WIN / YOU LOSE), the second
 device entering STAND BY late (the first one sends again).
 
+## Friends bump between two Paradise (T7_LINK)
+
+Friends: the bump icon, VISIT BUMP (VISIT on one, HOST on the other) or BFF BUMP. The game sends each packet itself, bit
+by bit on one line (`$303C` bit 0 out, `$3012` bit 7 in): `$F0`, command `$0160`, length `$0161`, the data at (`$C5`),
+the sum; status `$0164`. It runs the link in bank 0, so `t7_fr_hook` is called at the switch to bank 0 while the link
+runs: a packet just started is taken whole and reported sent, a packet from the other one is put in for a receive.
+Between the devices: `B` frames (up to 64 bytes, the rest in `b` frames with their offset). The code goes with the
+second part (PRAM is full). Checked on the PC with two cores in lockstep and on two devices.
+
 ## Clock note after a battery change (T7_CK_WRAP, 1.6.11 test1)
 
 When the game asks for the time, the noted game time is counted on with the Paradise's seconds counter. After a

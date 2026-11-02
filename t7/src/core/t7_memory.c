@@ -313,6 +313,9 @@ static void io_write_bank(uint8_t reg, uint8_t value)
 {
   g_cpureg[reg] = value;
   t7_set_rom_bank(value);
+#ifdef T7_LINK
+  if (!value && g_t7_frlink && (g_wram[0x164] & 3)) t7_fr_hook();   // Friends bump: the link runs
+#endif
 }
 
 // $3073, $3074: IRQ pending flags. Writes acknowledge (clear) pending bits.
@@ -339,6 +342,9 @@ static uint8_t io_read_porta(uint8_t reg)
   uint8_t spi_power = mask & value & 0x10;
   uint8_t inserted_figure = g_figure_id;
   uint8_t input = g_keys | ((spi_power ? 0 : inserted_figure) << 5);
+#ifdef T7_LINK
+  if (g_t7_static_off) input |= 0x80;   // Friends: bump line idle
+#endif
   return (mask & value) | (~mask & input);
 }
 
