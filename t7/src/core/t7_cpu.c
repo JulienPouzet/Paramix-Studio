@@ -643,7 +643,8 @@ T7_FR_ATTR void t7_fr_hook(void)
   t7_io_write(0x3031, st & 1 ? 0 : g_cpureg[0x31] & 0xFC); t7_io_write(0x303C, g_cpureg[0x3C] & 0xF6);
   g_wram[0x169] = 0; g_wram[0x16A] = 0; g_wram[0x164] = 0x80;
 }
-T7_FR_ATTR int t7_fr_tx_take(uint8_t *out) { int n = s_fr_txn; for (int i = 0; i < n; i++) out[i] = s_fr_tx[i]; s_fr_txn = 0; return n; }
+/* also no limit of 5 bumps a day: the game counts them in $032B and checks it at $DF08 */
+T7_FR_ATTR int t7_fr_tx_take(uint8_t *out) { int n = s_fr_txn; if (g_wram[0x32B] > 4) g_wram[0x32B] = 4; for (int i = 0; i < n; i++) out[i] = s_fr_tx[i]; s_fr_txn = 0; return n; }
 T7_FR_ATTR void t7_fr_rx(const uint8_t *p, int n)
 {
   s_fr_rxn = 0;
