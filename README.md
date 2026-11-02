@@ -370,7 +370,7 @@ part (under ▾ it only says how).
 | --- | --- |
 | T18Emu | CONNECTION, TAMAGOTCHI: playdate, gift, marriage (switch `T18_LINK`) |
 | T7Emu (Tama-Go) | connection, TAMA-GO, VISIT or GAME; B on the visiting one (`T7_LINK`) |
-| T7Emu (Friends) | the bump icon, VISIT BUMP (VISIT on one, HOST on the other) or BFF BUMP (`T7_LINK`) |
+| T7Emu (Friends) | the bump icon, VISIT BUMP (VISIT on one, HOST on the other) or BFF BUMP; alone, a virtual friend answers (`T7_LINK`) |
 | TamaEmu (P's, iD L) | P's: あそぶ, あそびにいく on one, ともだちをよぶ on the other; iD L: connection, iDL, PLAY (or SWAP ITEM) on both, B on one (`TC_IRLINK`, `LK_SYNC` since 1.7.1: the two emulators keep in step while they exchange) |
 | V1Emu (Digimon) | choose and start the battle (`V1_LINK`, not yet checked with a real battle) |
 | V3Emu | the connection in the game on both (`V3_LINK`, not yet checked on two devices) |

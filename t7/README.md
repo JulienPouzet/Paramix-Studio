@@ -230,6 +230,9 @@ runs: a packet just started is taken whole and reported sent, a packet from the 
 Between the devices: `B` frames (up to 64 bytes, the rest in `b` frames with their offset). The code goes with the
 second part (PRAM is full). Checked on the PC with two cores in lockstep and on two devices.
 
+Alone (no frame from another Paradise for 2.5 s) a virtual friend answers as a second Friends would: VISIT BUMP (both
+roles), BFF BUMP and SPECIAL. Six friends of its own (`t7_fr_cast`) come in turn, the specials too.
+
 ## Clock note after a battery change (T7_CK_WRAP, 1.6.11 test1)
 
 When the game asks for the time, the noted game time is counted on with the Paradise's seconds counter. After a

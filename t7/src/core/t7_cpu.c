@@ -560,6 +560,64 @@ int t7_ir_tx_take(uint8_t *out) { int n = s_ir_tx_n; if (!n) return 0; for (int 
 uint8_t g_t7_frlink;
 uint32_t g_t7_fr_act;
 static uint8_t s_fr_tx[130], s_fr_txn, s_fr_rx[130], s_fr_rxn;
+/* Bump alone: with no other Paradise on the contacts (g_t7_frsolo) a virtual friend answers in the friends' link scene
+ * ($22 = $08). Packets: 01, type, the sender's ID, contents; 00/01 introduction (character, name), 04/05 visit, 06/07
+ * BFF, 30/31 special. The game visits ($24 = $0D, $12): 00 -> 01, 04 -> 05, 06 -> 07. The game waits ($24 = $0C, $11,
+ * $15): 00 from us, its 01 brings 04 / 06 / 30. The friends of t7_fr_cast in turn, specials in turn from $02D9. */
+uint8_t g_t7_frsolo;
+uint8_t t7_fr_cast[T7_FR_CAST][11] T7_FR_DATA = {   /* ID, character, name (A = 0, $1A = space) */
+  { 0x2A, 0x11, 13, 0x0B, 0x14, 0x0D, 0x00, 0x1A, 0x1A, 0x1A, 0x1A },   /* LUNA */
+  { 0x2A, 0x12, 14, 0x0C, 0x0E, 0x02, 0x07, 0x08, 0x1A, 0x1A, 0x1A },   /* MOCHI */
+  { 0x2A, 0x13, 18, 0x0F, 0x08, 0x17, 0x04, 0x0B, 0x1A, 0x1A, 0x1A },   /* PIXEL */
+  { 0x2A, 0x14, 20, 0x0A, 0x08, 0x16, 0x08, 0x1A, 0x1A, 0x1A, 0x1A },   /* KIWI */
+  { 0x2A, 0x15, 23, 0x0D, 0x0E, 0x15, 0x00, 0x1A, 0x1A, 0x1A, 0x1A },   /* NOVA */
+  { 0x2A, 0x16, 31, 0x13, 0x0E, 0x05, 0x14, 0x1A, 0x1A, 0x1A, 0x1A },   /* TOFU */
+};
+static uint8_t s_solo_req, s_solo_done, s_solo_ix T7_FR_DATA = 0xFF, s_solo_sp T7_FR_DATA = 0xFF;
+static uint8_t s_solo_visit[3] T7_FR_DATA = { 0x00, 0x27, 0x3D }, s_solo_prize T7_FR_DATA = 0xFE, s_solo_zero T7_FR_DATA;
+T7_FR_ATTR static const uint8_t *solo_friend(void)
+{
+  if (s_solo_ix >= T7_FR_CAST) s_solo_ix = (uint8_t)(g_wram[0x306] % T7_FR_CAST);   /* the game's hour */
+  return t7_fr_cast[s_solo_ix];
+}
+T7_FR_ATTR static void solo_put(uint8_t type, const uint8_t *b, int n)
+{
+  const uint8_t *f = solo_friend();
+  uint8_t *p = s_fr_rx; p[0] = type; p[1] = (uint8_t)(4 + n); p[2] = 1; p[3] = type; p[4] = f[0]; p[5] = f[1];
+  for (int i = 0; i < n; i++) p[6 + i] = b[i];
+  s_fr_rxn = (uint8_t)(6 + n);
+}
+T7_FR_ATTR static void solo_intro(uint8_t type)
+{
+  if (s_solo_done) { s_solo_done = 0; s_solo_ix = (uint8_t)((s_solo_ix + 1) % T7_FR_CAST); }
+  const uint8_t *f = solo_friend();
+  uint8_t b[11]; b[0] = 0; b[1] = f[2]; b[2] = (uint8_t)((t7_read((uint16_t)(0xE1A7 + (f[2] < 0x27 ? f[2] : 0))) & 1) << 7);
+  for (int i = 0; i < 8; i++) b[3 + i] = f[3 + i];
+  solo_put(type, b, 11);
+}
+T7_FR_ATTR static void solo_answer(void)
+{
+  uint8_t t = s_fr_tx[0], r = s_solo_req, m = g_wram[0x24];
+  s_solo_req = 0;
+  if (g_wram[0x22] != 0x08) return;
+  if (t == 0x00 && (m == 0x0D || m == 0x12)) solo_intro(0x01);
+  else if (t == 0x01 && r == 0x04) solo_put(0x04, &s_solo_zero, 1);
+  else if (t == 0x01 && r == 0x06) solo_put(0x06, 0, 0);
+  else if (t == 0x01 && r == 0x30) {
+    if (s_solo_sp >= 60) s_solo_sp = g_wram[0x2D9] < 59 ? (uint8_t)(g_wram[0x2D9] + 1) : 0;
+    solo_put(0x30, &s_solo_sp, 1);
+  }
+  else if (t == 0x04) { solo_put(0x05, s_solo_visit, 3); s_solo_done = 1; }
+  else if (t == 0x06) { solo_put(0x07, &s_solo_prize, 1); s_solo_done = 1; }
+  else if (t == 0x31) { s_solo_sp = (uint8_t)((s_solo_sp + 1) % 60); s_solo_done = 1; }
+  else if (t == 0x05 || t == 0x07) s_solo_done = 1;
+}
+T7_FR_ATTR static void solo_start(void)
+{
+  uint8_t m = g_wram[0x24];
+  s_solo_req = g_wram[0x22] != 0x08 ? 0 : m == 0x0C ? 0x04 : m == 0x11 ? 0x06 : m == 0x15 ? 0x30 : 0;
+  if (s_solo_req) solo_intro(0x00);
+}
 T7_FR_ATTR void t7_fr_hook(void)
 {
   uint8_t st = g_wram[0x164]; uint32_t a = g_wram[0xC5] | g_wram[0xC6] << 8;
@@ -571,7 +629,9 @@ T7_FR_ATTR void t7_fr_hook(void)
     s_fr_tx[0] = g_wram[0x160]; s_fr_tx[1] = n;
     for (int i = 0; i < n; i++) s_fr_tx[2 + i] = d[i];
     s_fr_txn = (uint8_t)(n + 2);
+    if (g_t7_frsolo) solo_answer();
   } else {
+    if (!s_fr_rxn && g_t7_frsolo) solo_start();
     uint8_t n = s_fr_rx[1], s = (uint8_t)(s_fr_rx[0] + n);
     if (!s_fr_rxn || a + n > 0x600) return;
     s_fr_rxn = 0;

@@ -386,10 +386,12 @@ static void sess_auto(uint32_t now)
  * bridge's receive hook. Only taken while the game is in its connection screen (else an old packet would wait). */
 static uint32_t g_lk_act, g_lk_ms;
 /* Friends bump: each packet as a 'B' frame of up to 64 bytes, the rest in 'b' frames that start with their offset;
- * taken while the link runs or 1.5 s after a packet sent (the answer may come before the game waits for it) */
+ * taken while the link runs or 1.5 s after a packet sent (the answer may come before the game waits for it). With no
+ * other Paradise on the contacts (no frame for 2.5 s) the core's virtual friend answers instead (g_t7_frsolo) */
 static uint8_t g_fr_in[130], g_fr_n;
 T7_FR_ATTR static void fr_got(u8 ty, const u8 *d, int n)
 {
+  if (g_t7_frsolo) return;
   if (ty == 'B') g_fr_n = 0;
   else if (!g_fr_n || !n || d[0] != g_fr_n) { g_fr_n = 0; return; }
   else { d++; n--; }
@@ -399,8 +401,9 @@ T7_FR_ATTR static void fr_got(u8 ty, const u8 *d, int n)
 T7_FR_ATTR static void fr_send(void)
 {
   uint8_t p[130], f[64]; int n = t7_fr_tx_take(p);
+  g_t7_frsolo = (uint8_t)(!g_pl.last_rx || g_ms - g_pl.last_rx >= 2500u);
   if (n) g_lk_ms = g_ms; else if (g_ms - g_lk_ms >= 1500u) t7_fr_rx(0, 0);
-  if (!n) return;
+  if (!n || g_t7_frsolo) return;
   plink_send('B', p, n > 64 ? 64 : n);
   for (int o = 64; o < n; o += 63) { int k = n - o > 63 ? 63 : n - o; f[0] = (uint8_t)o; for (int i = 0; i < k; i++) f[1 + i] = p[o + i]; plink_send('b', f, k + 1); }
 }

@@ -130,14 +130,19 @@ int  t7_ir_tx_take(uint8_t *out32);         // T7_LINK (1.6.9): packet sent just
 // T7_LINK, Friends bump (t7_cpu.c), with the second part (PRAM is full)
 #if defined(T7_JIT) && defined(T7_FREESTANDING)
 #define T7_FR_ATTR __attribute__((section(".xcode_link"), noinline, minsize))
+#define T7_FR_DATA __attribute__((section(".xcode_linkd")))
 #else
 #define T7_FR_ATTR __attribute__((noinline))
+#define T7_FR_DATA
 #endif
+#define T7_FR_CAST 6                        // friends of the virtual friend (bump alone)
 extern uint8_t  g_t7_frlink;                // 1 = Friends bump on (set by the program)
 extern uint32_t g_t7_fr_act;                // counts the passes with a receive armed (the connection screen)
 void t7_fr_hook(void);
 int  t7_fr_tx_take(uint8_t *out130);        // packet sent just now: command, length, data; its size, 0 = none
 void t7_fr_rx(const uint8_t *p, int n);     // packet from the other one for the next receive
+extern uint8_t  g_t7_frsolo;                // 1 = no other Paradise: the virtual friend answers (set by the program)
+extern uint8_t  t7_fr_cast[T7_FR_CAST][11]; // its friends: ID, character (0-38), name (8 letters)
 int  t7_ir_tx_pending(void);                // 1 = Firmware wartet auf Sende-Completion
 void t7_ir_tx_complete(void);               // Sende-Completion ausloesen (zeitverzoegert)
 
